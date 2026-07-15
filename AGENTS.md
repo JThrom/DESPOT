@@ -10,13 +10,26 @@ this repository.
 - Hardware target: ESP32-P4. Primary/default board: Elecrow CrowPanel
   Advanced 9" (1024x600 IPS, Wi-Fi 6). Secondary board: Waveshare
   ESP32-P4-WIFI6-Touch-LCD-7B. Legacy path: ESP32-S3.
-- Typical flash port: `/dev/ttyACM0` (also seen as `/dev/ttyUSB0`)
+- Typical flash port: `/dev/ttyUSB0` (also seen as `/dev/ttyACM0`);
+  `scripts/flash.sh` auto-detects (prefers `/dev/ttyUSB0`)
 - Current goal: keep terminal rendering stable for LazyVim while executing the
   phased SSH compatibility plan toward Linux-like server/auth coverage.
 
 ## Build and Flash
 
-Default build (primary CrowPanel Advanced 9" board):
+Pinned toolchain: **ESP-IDF `v6.1-dev` @ commit
+`f21b4c238152dc9e3a24fbad9afe33a3d15f6cfd`**. The wrapper scripts enforce this
+(`scripts/idf_env.sh`); mismatch is a hard error unless `REQUIRE_IDF=0`.
+
+Preferred (version-checked) build/flash:
+
+```bash
+scripts/build.sh                 # default CrowPanel Advanced 9"
+scripts/flash.sh                 # auto-detect port (prefers /dev/ttyUSB0)
+scripts/build.sh --waveshare     # secondary Waveshare P4 7" board
+```
+
+Manual equivalent (primary CrowPanel Advanced 9" board):
 
 ```bash
 export IDF_PATH="$HOME/projects/esp-idf"
@@ -122,8 +135,9 @@ mbedTLS 3.6.4 natively on Linux (scratch dir `/tmp/opencode/sshdbg`).
    - terminal.shop offers ONLY `ssh-ed25519` host keys (verified via
      `ssh -vv`); the old build had `LIBSSH2_ED25519 0` so KEX negotiation
      had no hostkey overlap (`rc=-5`/`rc=-8`).
-   - The libssh2 fork at `../../libssh2_esp` (see `override_path` in
-     `main/idf_component.yml`) now implements ed25519 hostkey verification
+   - The libssh2 fork at `third_party/libssh2_esp` (git submodule; see
+     `override_path` in `main/idf_component.yml`) now implements ed25519
+     hostkey verification
      in the mbedTLS backend using vendored ref10 code
      (`src/ed25519_ref10_verify.c`, `src/third_party/ed25519_ref10/`).
    - The fork also improves kex error reporting (inner error codes/messages
@@ -158,12 +172,14 @@ Known limitation discovered during this work:
   profile prefers `ecdh-sha2-nistp256` first, which works. Enable PSA or
   avoid curve25519-first profiles if this ever surfaces.
 
-Build reproducibility warning:
-- The libssh2 fork (`../../libssh2_esp`) currently carries UNCOMMITTED
-  changes in both the component repo and its `libssh2` submodule
-  (mbedtls.c/h, kex.c, session.c, channel.c/h, ed25519 files). The
-  firmware cannot be rebuilt identically without that tree. Commit that
-  fork or vendor it before relying on clean checkouts.
+Build reproducibility (resolved):
+- The libssh2 fork is now committed and vendored as a git submodule at
+  `third_party/libssh2_esp` (`JThrom/libssh2_esp` @ `ed25519`), with its
+  nested `libssh2` submodule pinned to `JThrom/libssh2` @
+  `esp-ed25519-compat` (commit `26ca3761`, the ed25519/kex patches).
+  `main/idf_component.yml` `override_path: ../third_party/libssh2_esp` uses
+  it. A clean `git clone --recursive` (or `git submodule update --init
+  --recursive`) reproduces the exact tree; no sibling repos required.
 
 ## Open Bugs (Current Priority)
 

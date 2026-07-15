@@ -5,6 +5,8 @@
 
 # ESP-IDF generated outputs
 build/
+build/**
+build_*/
 .idf/
 managed_components/
 
@@ -12,6 +14,15 @@ managed_components/
 sdkconfig
 sdkconfig.old
 dependencies.lock
+
+# CMake / compile-database artifacts emitted at project root
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+
+# Host unit-test build tree (test/unit/run.sh -> build/unit)
+build/unit/
 
 # Build/log artifacts sometimes emitted at project root
 *.bin

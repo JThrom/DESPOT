@@ -1,0 +1,4 @@
+[submodule "third_party/libssh2_esp"]
+	path = third_party/libssh2_esp
+	url = https://github.com/JThrom/libssh2_esp.git
+	branch = ed25519

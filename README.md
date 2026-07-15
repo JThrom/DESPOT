@@ -158,7 +158,8 @@ Linux build of the forked libssh2 against the live server:
 
 1. `ssh-ed25519` host key support (Phase 1 complete):
    - vendored ref10 ed25519 verification added to the libssh2 fork's
-     mbedTLS backend (`../../libssh2_esp`, used via `override_path`),
+     mbedTLS backend (`third_party/libssh2_esp` submodule, used via
+     `override_path`),
    - fork also propagates specific KEX failure reasons instead of the
      generic `-8 Unable to exchange encryption keys`.
 2. Channel-startup ordering:
@@ -174,8 +175,10 @@ Linux build of the forked libssh2 against the live server:
      task and main loop interleaved bytes mid-escape-sequence, corrupting
      queries and dropping replies.
 
-Note: the libssh2 fork carries the ed25519/kex patches as local changes;
-commit or vendor that tree for reproducible builds.
+Note: the libssh2 fork's ed25519/kex patches are now committed and vendored
+as a git submodule (`third_party/libssh2_esp`, with nested
+`third_party/libssh2_esp/libssh2`), so clean `--recursive` checkouts build
+reproducibly. See "Building From Scratch" below.
 
 ## Recent SSH/Tailnet Stabilization (2026-05)
 
@@ -227,7 +230,8 @@ Behavior notes:
 - Project: `DESPOT`
 - Branch: `master`
 - Hardware target: ESP32-P4 (primary active target)
-- Typical flash port: `/dev/ttyACM0`
+- Typical flash port: `/dev/ttyUSB0` (also seen as `/dev/ttyACM0`);
+  `scripts/flash.sh` auto-detects
 - Semantic firmware version: `1.0.0`
 
 ## Runtime Architecture
@@ -431,7 +435,8 @@ Locked dependency versions from `dependencies.lock`:
 
 - `idf`: `6.1.0`
 - `lvgl/lvgl`: `9.5.0`
-- `skuodi/libssh2_esp`: `1.1.0`
+- `skuodi/libssh2_esp`: `1.1.0` (satisfied locally by the patched fork
+  vendored at `third_party/libssh2_esp` via `override_path`, not the registry)
 - `espressif/usb`: `1.1.0` (pinned for ESP32-P4 build compatibility)
 - `espressif/usb_host_hid`: `1.2.0`
 - `espressif/esp_lcd_touch`: `1.2.1`
@@ -456,7 +461,134 @@ Project/component declarations:
   - `espressif/usb =1.1.0` (ESP32-P4 rule)
   - `espressif/usb_host_hid *` (ESP32-P4 rule)
   - `lvgl/lvgl ^9.4.0`
-  - `skuodi/libssh2_esp ^1.1.0`
+  - `skuodi/libssh2_esp ^1.1.0` with
+    `override_path: ../third_party/libssh2_esp` (the vendored fork submodule)
+
+## Building From Scratch (Complete Walkthrough)
+
+These steps take a bare machine to a flashed device. They assume Linux with a
+`/dev/ttyUSB0` serial port (adjust the port as needed; `scripts/flash.sh`
+auto-detects it).
+
+### 1. Install prerequisites
+
+- Git, Python 3, and CMake (>= 3.16) via your package manager.
+- USB serial access: make sure your user can read/write the flash port
+  (add yourself to the `dialout` group, or use `sudo`).
+
+### 2. Install ESP-IDF (pinned version)
+
+DESPOT is built and validated against a specific ESP-IDF snapshot:
+
+- Version: **`v6.1-dev`**
+- Commit: **`f21b4c238152dc9e3a24fbad9afe33a3d15f6cfd`**
+
+This exact commit is enforced by the build scripts (`scripts/idf_env.sh`); a
+mismatch is a hard error unless you set `REQUIRE_IDF=0`. Install it once and
+reuse it:
+
+```bash
+git clone https://github.com/espressif/esp-idf.git ~/projects/esp-idf
+cd ~/projects/esp-idf
+git checkout f21b4c238152dc9e3a24fbad9afe33a3d15f6cfd
+git submodule update --init --recursive
+./install.sh esp32p4
+```
+
+`IDF_PATH` in the build commands below points at this checkout
+(`~/projects/esp-idf`). If you install elsewhere, `export IDF_PATH=...` before
+running the scripts.
+
+> Note: `v6.1-dev` is a pre-release development snapshot, not the tagged
+> `release/v6.1`. The pinned commit is required because DESPOT depends on
+> behavior in that snapshot (e.g. the C6 ESP-Hosted slave OTA path forces
+> `H_OTA_CHECK_IMAGE_VALIDITY 0` because `esp_ota_check_image_validity` is
+> absent in this dev tree). Building against a different ESP-IDF is
+> unsupported.
+
+### 3. Clone DESPOT with its submodules
+
+The patched SSH stack is vendored as a git submodule, which itself contains
+the patched libssh2 as a nested submodule. `--recursive` pulls both:
+
+```bash
+git clone --recursive https://github.com/JThrom/DESPOT.git
+cd DESPOT
+```
+
+If you already cloned without `--recursive`, initialize the submodules:
+
+```bash
+git submodule update --init --recursive
+```
+
+The SSH dependency lives at `third_party/libssh2_esp`
+(`JThrom/libssh2_esp` @ `ed25519`) and its nested libssh2 at
+`third_party/libssh2_esp/libssh2` (`JThrom/libssh2` @ `esp-ed25519-compat`).
+`main/idf_component.yml` points `override_path` at that submodule, so the
+firmware always builds against the local, version-pinned fork. No sibling
+repositories or manual paths are required — everything builds from this one
+tree.
+
+### 4. Build and flash
+
+The wrapper scripts set `IDF_PATH`, verify the pinned ESP-IDF commit, source
+`export.sh`, ensure submodules are present, and run `idf.py`:
+
+```bash
+scripts/build.sh                 # default CrowPanel Advanced 9" board
+scripts/flash.sh                 # auto-detect port (prefers /dev/ttyUSB0)
+```
+
+`scripts/flash.sh` auto-detects the serial port: it uses `/dev/ttyUSB0` if
+present, otherwise the first available `/dev/ttyUSB*` or `/dev/ttyACM*`. If no
+device is found it prints all available serial devices and exits.
+
+Options:
+
+```bash
+scripts/build.sh --waveshare     # secondary Waveshare P4 7" board
+scripts/flash.sh -p /dev/ttyACM0 # force a specific port
+PORT=/dev/ttyACM0 scripts/flash.sh
+IDF_PATH=/opt/esp-idf scripts/build.sh
+REQUIRE_IDF=0 scripts/build.sh   # allow a non-pinned ESP-IDF (unsupported)
+```
+
+The first build also downloads the remaining registry-managed dependencies
+(LVGL, esp_hosted, touch drivers, etc.) into `managed_components/`
+automatically.
+
+Equivalent manual invocation (if you prefer not to use the scripts):
+
+```bash
+export IDF_PATH="$HOME/projects/esp-idf"
+. "$IDF_PATH/export.sh"
+idf.py set-target esp32p4        # first build only
+idf.py build
+idf.py -p /dev/ttyACM0 flash
+```
+
+### 5. (Optional) Monitor
+
+```bash
+idf.py -p /dev/ttyACM0 monitor
+```
+
+> Serial-monitor-attach note (CrowPanel hardware quirk): attaching the monitor
+> pulses the USB-serial DTR/RTS and can reset the P4 while the C6 stays stale.
+> Power-cycle the board **after** the monitor connects, or use a no-reset
+> monitor.
+
+### Updating the vendored SSH fork later
+
+The submodules are pinned to specific commits. To move them forward after
+changes land on the forks:
+
+```bash
+git submodule update --remote --recursive third_party/libssh2_esp
+git add third_party/libssh2_esp
+git commit -m "Bump libssh2_esp submodule"
+```
 
 ## Build, Flash, and Monitor
 
