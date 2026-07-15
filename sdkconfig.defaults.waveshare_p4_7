@@ -1,0 +1,28 @@
+# Waveshare ESP32-P4-WIFI6-Touch-LCD-7B board overrides (SECONDARY board).
+#
+# The primary/default target is the CrowPanel Advanced 9" (configured in
+# sdkconfig.defaults.esp32p4). Apply this overlay ON TOP to build for the
+# secondary Waveshare 7" board:
+#   idf.py -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.esp32p4;sdkconfig.defaults.waveshare_p4_7" build
+#
+# This file only carries the deltas from sdkconfig.defaults.esp32p4 that are
+# specific to the Waveshare 7" hardware.
+
+# Select the Waveshare display driver (EK79007 + CH422G), touch pins and
+# board-aware strings.
+CONFIG_DESPOT_BOARD_WAVESHARE_P4_7=y
+
+# Waveshare ESP32-P4-WIFI6-Touch-LCD-7B ships with 32MB flash. Override the
+# 16MB header used by the primary CrowPanel board.
+CONFIG_ESPTOOLPY_FLASHSIZE_32MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="32MB"
+
+# Brownout detector: the Waveshare board has no software power-path management,
+# so when USB is unplugged the onboard charger/power-path switches the system
+# rail from VBUS to the Li-ion battery. That handover causes a brief rail dip.
+# At the stock highest-sensitivity level (SEL_7) the brownout detector trips on
+# that dip and resets the chip even though the battery alone runs the board
+# fine. Lower the threshold so the transient switchover dip is tolerated while
+# still protecting against a genuine sustained undervoltage.
+CONFIG_ESP_BROWNOUT_DET_LVL_SEL_5=y
+CONFIG_ESP_BROWNOUT_DET_LVL=5

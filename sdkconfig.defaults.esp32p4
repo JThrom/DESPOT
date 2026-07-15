@@ -1,0 +1,79 @@
+# ESP-IDF 6.1.0 Project Configuration (ESP32-P4).
+# Primary/default target: Elecrow CrowPanel Advanced 9". This file is applied
+# automatically for esp32p4 builds. For the secondary Waveshare board, layer
+# the Waveshare overlay:
+#   idf.py -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.esp32p4;sdkconfig.defaults.waveshare_p4_7" build
+CONFIG_IDF_TARGET="esp32p4"
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+
+# ESP32-P4 ECO0/ECO1/ECO2 compatibility
+CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y
+CONFIG_ESP32P4_REV_MIN_100=y
+
+# Main task stack
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=16384
+
+# Partition table
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
+
+# Primary/default board: Elecrow CrowPanel Advanced 9" (ESP32-P4NRW32,
+# 16MB flash, 32MB integrated PSRAM). Select the CrowPanel display driver,
+# touch pins and board-aware strings by default.
+CONFIG_DESPOT_BOARD_CROWPANEL_ADV_9=y
+
+# CrowPanel ships with 16MB flash. Keep the image header at 16MB so the
+# runtime flash-size check matches the hardware.
+# (The secondary Waveshare board has 32MB; use the Waveshare overlay for it.)
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
+
+# lwIP / sockets baseline
+CONFIG_LWIP_MAX_SOCKETS=16
+CONFIG_LWIP_SO_RCVBUF=y
+CONFIG_LWIP_TCPIP_RECVMBOX_SIZE=64
+CONFIG_LWIP_TCP_SND_BUF_DEFAULT=32768
+CONFIG_LWIP_TCP_WND_DEFAULT=32768
+
+# ESP-Hosted (P4 <-> C6) conservative memory/stability tuning
+CONFIG_ESP_HOSTED_USE_MEMPOOL=n
+CONFIG_ESP_HOSTED_SDIO_TX_Q_SIZE=8
+CONFIG_ESP_HOSTED_SDIO_RX_Q_SIZE=8
+CONFIG_ESP_HOSTED_MAX_SIMULTANEOUS_SYNC_RPC_REQUESTS=2
+CONFIG_ESP_HOSTED_MAX_SIMULTANEOUS_ASYNC_RPC_REQUESTS=2
+CONFIG_ESP_HOSTED_CLI_ENABLED=n
+CONFIG_ESP_HOSTED_MEM_MONITOR=n
+CONFIG_ESP_HOSTED_ENABLE_ITWT=n
+CONFIG_ESP_HOSTED_SDIO_CLOCK_FREQ_KHZ=40000
+# Do not hard-reboot the P4 on a transient SDIO transport failure. A serial-
+# monitor attach pulses the CrowPanel's USB-serial DTR/RTS, which triggers a
+# P4-only SW_CPU_RESET (the C6 keeps running / goes stale), so the next SDIO
+# register read fails (sdmmc 0x107). With RESTART_ON_FAILURE enabled (default)
+# that calls _h_restart_host() and loops forever until a cold power cycle. With
+# it disabled the driver logs the error and continues, recovering the C6 on the
+# next transaction. (The Waveshare P4 board gets a clean full POWERON from the
+# same action and does not need this; the difference is board reset wiring.)
+# A TRANSPORT_FAILURE event is still posted regardless of this setting.
+CONFIG_ESP_HOSTED_TRANSPORT_RESTART_ON_FAILURE=n
+CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE=y
+CONFIG_ESP_HOSTED_NIMBLE_HCI_VHCI=y
+# SDIO bus width: 1-bit @ 40 MHz. CrowPanel V1.1+ wires the C6 over 4-wire SDIO
+# (D0-D3 = IO17/16/15/14), but 4-bit @ 40 MHz showed transient (self-recovering)
+# SDIO read glitches (sdmmc 0x109 in sdio_get_tx_buffer_num). 1-bit trades WiFi
+# throughput for signal-integrity margin. To go back to 4-bit: set
+# CONFIG_ESP_HOSTED_SDIO_4_BIT_BUS=y / _BUS_WIDTH=4 and remove the 1-bit lines.
+CONFIG_ESP_HOSTED_SDIO_1_BIT_BUS=y
+CONFIG_ESP_HOSTED_SDIO_BUS_WIDTH=1
+
+# NimBLE host-only should use Hosted VHCI, not UART pins
+# CONFIG_BT_NIMBLE_TRANSPORT_UART is not set
+
+# Brownout detector: keep the ESP-IDF default sensitivity (SEL_7) for the
+# primary CrowPanel board. The lowered-threshold workaround (SEL_5) is
+# specific to the Waveshare board's USB->battery power-path handover dip and
+# lives in the Waveshare overlay (sdkconfig.defaults.waveshare_p4_7).
+CONFIG_ESP_BROWNOUT_DET=y
+
+# LVGL
+CONFIG_LV_USE_GIF=y

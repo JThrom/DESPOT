@@ -1,0 +1,35 @@
+menu "DESPOT Board Selection"
+
+choice DESPOT_BOARD
+    prompt "Target hardware board"
+    default DESPOT_BOARD_CROWPANEL_ADV_9
+    help
+        Selects the physical board / display panel the firmware is built for.
+        Only meaningful on ESP32-P4 builds; the legacy ESP32-S3 RGB path is
+        selected by the IDF target and ignores this choice.
+
+    config DESPOT_BOARD_CROWPANEL_ADV_9
+        bool "CrowPanel Advanced 9inch ESP32-P4 HMI (1024x600 IPS touch, WiFi6)"
+        help
+            Elecrow CrowPanel Advanced 9-inch ESP32-P4 HMI AI display,
+            1024x600 IPS with capacitive touch and an ESP32-C6 WiFi-6
+            co-processor. This is the primary / default target board.
+
+            EK79007 MIPI-DSI panel (no CH422G IO-expander); GT911 touch on
+            I2C SDA45/SCL46 (RST40, INT42); backlight PWM on GPIO31
+            (active-high); DSI PHY LDO channel 3, panel rail LDO channel 4.
+            16MB flash, 32MB PSRAM (ESP32-P4NRW32).
+
+    config DESPOT_BOARD_WAVESHARE_P4_7
+        bool "Waveshare ESP32-P4-WIFI6-Touch-LCD-7B (1024x600, EK79007, CH422G)"
+        help
+            Secondary board. Waveshare 7-inch MIPI-DSI panel (EK79007 driver
+            IC) with a CH422G I2C IO-expander driving DISP/backlight/touch-
+            reset. Backlight on GPIO32 (active-low), panel reset on GPIO33,
+            DSI PHY LDO channel 3. 32MB flash.
+
+            To build for this board, apply the Waveshare overlay:
+            idf.py -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.esp32p4;sdkconfig.defaults.waveshare_p4_7" build
+endchoice
+
+endmenu
