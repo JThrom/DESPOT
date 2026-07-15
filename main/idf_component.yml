@@ -28,4 +28,8 @@ dependencies:
   lvgl/lvgl: ^9.4.0
   skuodi/libssh2_esp:
     version: ^1.1.0
-    override_path: ../../libssh2_esp
+    # Patched fork vendored as a git submodule at third_party/libssh2_esp
+    # (JThrom/libssh2_esp @ ed25519 -> JThrom/libssh2 @ esp-ed25519-compat).
+    # Kept out of components/ so ESP-IDF does not also auto-discover it and
+    # double-register the component. Path is relative to this manifest (main/).
+    override_path: ../third_party/libssh2_esp
